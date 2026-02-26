@@ -2,8 +2,8 @@ import Foundation
 import SwiftUI
 
 enum Person: String, CaseIterable, Identifiable {
-    case me = "我"
-    case girlfriend = "女朋友"
+    case me = "Zack Chen"
+    case girlfriend = "Aria Luo"
 
     var color: Color {
         switch self {

@@ -33,17 +33,30 @@ final class PersistenceController {
 
         container = NSPersistentContainer(name: "WeightModel", managedObjectModel: model)
 
-        // Explicitly configure store description to avoid conflicts
-        let description = NSPersistentStoreDescription()
-        description.type = NSSQLiteStoreType
-        container.persistentStoreDescriptions = [description]
-        if inMemory {
+        // Configure store description with explicit URL for Documents directory
+        if !inMemory {
+            let storeDescription = NSPersistentStoreDescription()
+            storeDescription.type = NSSQLiteStoreType
+
+            // Get Documents directory and create store URL
+            let fileManager = FileManager.default
+            if let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let storeURL = documentsURL.appendingPathComponent("WeightModel.sqlite")
+                storeDescription.url = storeURL
+            }
+
+            storeDescription.shouldInferMappingModelAutomatically = true
+            storeDescription.shouldMigrateStoreAutomatically = true
+            container.persistentStoreDescriptions = [storeDescription]
+        } else {
             container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
         }
+
         container.loadPersistentStores { description, error in
             if let error = error {
                 fatalError("Unresolved error \(error)")
             }
+            print("CoreData store location: \(description.url?.path ?? "unknown")")
         }
         container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
     }
@@ -52,6 +65,7 @@ final class PersistenceController {
         if context.hasChanges {
             do {
                 try context.save()
+                print("Data saved successfully")
             } catch {
                 let nserr = error as NSError
                 fatalError("Unresolved error \(nserr), \(nserr.userInfo)")

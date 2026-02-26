@@ -59,8 +59,8 @@
 ### Person 枚举
 ```swift
 enum Person: String, CaseIterable, Identifiable {
-    case me = "我"
-    case girlfriend = "女朋友"
+    case me = "Zack Chen"
+    case girlfriend = "Aria Luo"
 
     var id: String { rawValue }
     var color: Color { 蓝色/粉色区分 }
@@ -181,7 +181,7 @@ public class Weight: NSManagedObject {
 ## 使用说明
 
 ### 用户操作流程
-1. 打开应用，选择"我"或"女朋友"标签
+1. 打开应用，选择"Zack Chen"或"Aria Luo"标签
 2. 选择日期，输入体重，点击"保存"
 3. 查看体重变化曲线和统计数据
 4. 可选择移动平均天数，查看不同天数的趋势
@@ -191,7 +191,7 @@ public class Weight: NSManagedObject {
 
 ### 配置选项
 - 移动平均天数：3天、4天、5天、6天、7天、10天、14天、30天
-- 提醒时间：固定为 09:00
+- 提醒时间：固定为 22:00
 - 数据存储：本地 CoreData 数据库
 
 ## 维护说明

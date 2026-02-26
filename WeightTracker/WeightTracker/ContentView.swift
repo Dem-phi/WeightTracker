@@ -44,6 +44,8 @@ struct PersonWeightView: View {
 
     private let notif = NotificationManager()
 
+    @FocusState private var isWeightFieldFocused: Bool
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -72,6 +74,9 @@ struct PersonWeightView: View {
             }
             .navigationTitle("体重追踪")
             .onAppear { checkNotificationStatus() }
+            .onTapGesture {
+                isWeightFieldFocused = false
+            }
         }
     }
 
@@ -84,6 +89,7 @@ struct PersonWeightView: View {
 
                 TextField("体重 (kg)", text: $weightText)
                     .keyboardType(.decimalPad)
+                    .focused($isWeightFieldFocused)
                     .frame(maxWidth: 120)
 
                 Button("保存") { saveEntry() }
@@ -155,7 +161,7 @@ struct PersonWeightView: View {
                 Divider()
 
                 // 提醒开关
-                Toggle("每日提醒（09:00）", isOn: $remindersEnabled)
+                Toggle("每日提醒（22:00）", isOn: $remindersEnabled)
                     .onChange(of: remindersEnabled) { new in
                         if new { requestAndSchedule() } else { notif.cancelDaily() }
                     }
@@ -171,13 +177,13 @@ struct PersonWeightView: View {
                     HStack {
                         Text(w.date, style: .date)
                         Spacer()
-                        Text(String(format: "%.1f kg", w.weight))
+                        Text(String(format: "%.2f kg", w.weight))
                             .foregroundColor(.secondary)
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectedDate = w.date
-                        weightText = String(format: "%.1f", w.weight)
+                        weightText = String(format: "%.2f", w.weight)
                     }
                 }
                 .onDelete(perform: delete)
@@ -213,6 +219,7 @@ struct PersonWeightView: View {
             }
             try viewContext.save()
             weightText = ""
+            isWeightFieldFocused = false
         } catch {
             print(error)
         }
@@ -227,17 +234,17 @@ struct PersonWeightView: View {
 
     private func latestWeightText() -> String {
         guard let last = weights.last else { return "—" }
-        return String(format: "%.1f kg", last.weight)
+        return String(format: "%.2f kg", last.weight)
     }
 
     private func highestWeightText() -> String {
         guard let highest = weights.max(by: { $0.weight < $1.weight }) else { return "—" }
-        return String(format: "%.1f kg", highest.weight)
+        return String(format: "%.2f kg", highest.weight)
     }
 
     private func lowestWeightText() -> String {
-        guard let lowest = weights.min(by: { $0.weight > $1.weight }) else { return "—" }
-        return String(format: "%.1f kg", lowest.weight)
+        guard let lowest = weights.min(by: { $0.weight < $1.weight }) else { return "—" }
+        return String(format: "%.2f kg", lowest.weight)
     }
 
     private func movingAverage(window: Int) -> [(Date, Double)] {
@@ -256,7 +263,7 @@ struct PersonWeightView: View {
     private func movingAverageText(window: Int) -> String {
         let ma = movingAverage(window: window)
         guard let last = ma.last else { return "—" }
-        return String(format: "%.1f kg", last.1)
+        return String(format: "%.3f kg", last.1)
     }
 
     // MARK: - Notifications
