@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -scheme WeightTracker -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' build)",
+      "Bash(swiftc -parse ./WeightTracker/WeightTrackerApp.swift)",
+      "Bash(swiftc -parse ./WeightTracker/ContentView.swift)",
+      "Bash(swiftc -parse ./WeightTracker/PersistenceController.swift)",
+      "Bash(swiftc -parse /Users/demphi/Projects/ZackApp/WeightTracker/WeightTracker/WeightTracker/Weight.swift)",
+      "Bash(swiftc -parse /Users/demphi/Projects/ZackApp/WeightTracker/WeightTracker/WeightTracker/NotificationManager.swift)",
+      "Bash(swiftc -parse /Users/demphi/Projects/ZackApp/WeightTracker/WeightTracker/Weight.swift)"
+    ]
+  }
+}
