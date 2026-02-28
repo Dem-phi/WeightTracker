@@ -41,10 +41,16 @@ struct PersonWeightView: View {
     @State private var weightText: String = ""
     @State private var remindersEnabled: Bool = false
     @State private var averageDays: Int = 7
+    @State private var yScaleMin: Double = 50.0
+    @State private var yScaleMax: Double = 80.0
+    @State private var yScaleMinText: String = "50.0"
+    @State private var yScaleMaxText: String = "80.0"
 
     private let notif = NotificationManager()
 
     @FocusState private var isWeightFieldFocused: Bool
+    @FocusState private var isYScaleMinFocused: Bool
+    @FocusState private var isYScaleMaxFocused: Bool
 
     var body: some View {
         NavigationView {
@@ -76,6 +82,8 @@ struct PersonWeightView: View {
             .onAppear { checkNotificationStatus() }
             .onTapGesture {
                 isWeightFieldFocused = false
+                isYScaleMinFocused = false
+                isYScaleMaxFocused = false
             }
         }
     }
@@ -105,31 +113,86 @@ struct PersonWeightView: View {
                     .frame(maxWidth: .infinity, minHeight: 200)
                     .foregroundColor(.secondary)
             } else {
-                Chart {
-                    ForEach(weights) { w in
-                        LineMark(x: .value("日期", w.date), y: .value("体重", w.weight))
-                            .foregroundStyle(person.color)
-                        PointMark(x: .value("日期", w.date), y: .value("体重", w.weight))
-                            .foregroundStyle(person.color)
+                VStack(spacing: 8) {
+                    Chart {
+                        ForEach(weights) { w in
+                            LineMark(x: .value("日期", w.date), y: .value("体重", w.weight))
+                                .foregroundStyle(person.color)
+                            PointMark(x: .value("日期", w.date), y: .value("体重", w.weight))
+                                .foregroundStyle(person.color)
+                        }
                     }
+                    .chartYScale(domain: yScaleMin...yScaleMax)
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 6)) { _ in
+                            AxisGridLine()
+                            AxisTick()
+                            AxisValueLabel(format: .dateTime.month().day())
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(values: .stride(by: calculateStride())) { _ in
+                            AxisGridLine()
+                            AxisTick()
+                            AxisValueLabel()
+                        }
+                    }
+                    .frame(height: 240)
 
-                    // 移动平均线
-                    let ma = movingAverage(window: averageDays)
-                    ForEach(0..<ma.count, id: \.self) { i in
-                        let pair = ma[i]
-                        LineMark(x: .value("日期", pair.0), y: .value("平均体重", pair.1))
-                            .foregroundStyle(person.color.opacity(0.7))
-                            .lineStyle(StrokeStyle(lineWidth: 2, dash: [5]))
+                    // 手动输入纵坐标范围
+                    HStack(spacing: 12) {
+                        Text("纵坐标范围:")
+                            .font(.caption)
+
+                        TextField("最小", text: $yScaleMinText)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 60)
+                            .focused($isYScaleMinFocused)
+
+                        Text("-")
+                            .font(.caption)
+
+                        TextField("最大", text: $yScaleMaxText)
+                            .keyboardType(.decimalPad)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .frame(width: 60)
+                            .focused($isYScaleMaxFocused)
+
+                        Text("kg")
+                            .font(.caption)
+
+                        Spacer()
+
+                        Button(action: {
+                            applyYScaleRange()
+                            isYScaleMinFocused = false
+                            isYScaleMaxFocused = false
+                        }) {
+                            Text("应用")
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(6)
+                        }
+
+                        Button(action: {
+                            resetZoom()
+                            isYScaleMinFocused = false
+                            isYScaleMaxFocused = false
+                        }) {
+                            Text("重置")
+                                .font(.caption)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.gray)
+                                .foregroundColor(.white)
+                                .cornerRadius(6)
+                        }
                     }
                 }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                        AxisGridLine()
-                        AxisTick()
-                        AxisValueLabel(format: .dateTime.month().day())
-                    }
-                }
-                .frame(height: 240)
             }
         }
     }
@@ -264,6 +327,57 @@ struct PersonWeightView: View {
         let ma = movingAverage(window: window)
         guard let last = ma.last else { return "—" }
         return String(format: "%.3f kg", last.1)
+    }
+
+    // MARK: - Zoom
+
+    private func calculateStride() -> Double {
+        let range = yScaleMax - yScaleMin
+        if range <= 5 {
+            return 1
+        } else if range <= 10 {
+            return 2
+        } else if range <= 20 {
+            return 5
+        } else {
+            return 10
+        }
+    }
+
+    private func applyYScaleRange() {
+        guard let minVal = Double(yScaleMinText),
+              let maxVal = Double(yScaleMaxText) else {
+            return
+        }
+
+        // 验证输入的范围
+        if minVal >= 0 && maxVal <= 100 && minVal < maxVal && (maxVal - minVal) >= 2 {
+            // 计算数据的实际范围
+            guard let dataMin = weights.map({ $0.weight }).min(),
+                  let dataMax = weights.map({ $0.weight }).max() else {
+                return
+            }
+
+            // 自动调整范围，确保包含所有数据点
+            // 添加 5% 的 padding 来确保曲线不会正好在边界上
+            let padding = (maxVal - minVal) * 0.05
+            let adjustedMin = min(minVal, dataMin - padding)
+            let adjustedMax = max(maxVal, dataMax + padding)
+
+            yScaleMin = adjustedMin
+            yScaleMax = adjustedMax
+
+            // 更新文本显示
+            yScaleMinText = String(format: "%.1f", adjustedMin)
+            yScaleMaxText = String(format: "%.1f", adjustedMax)
+        }
+    }
+
+    private func resetZoom() {
+        yScaleMin = 50.0
+        yScaleMax = 80.0
+        yScaleMinText = "50.0"
+        yScaleMaxText = "80.0"
     }
 
     // MARK: - Notifications
