@@ -45,6 +45,7 @@ struct PersonWeightView: View {
     @State private var yScaleMax: Double = 80.0
     @State private var yScaleMinText: String = "50.0"
     @State private var yScaleMaxText: String = "80.0"
+    @State private var hasInitializedYScale: Bool = false
 
     private let notif = NotificationManager()
 
@@ -79,7 +80,10 @@ struct PersonWeightView: View {
                 .padding()
             }
             .navigationTitle("体重追踪")
-            .onAppear { checkNotificationStatus() }
+            .onAppear {
+                checkNotificationStatus()
+                initializeYScale()
+            }
             .onTapGesture {
                 isWeightFieldFocused = false
                 isYScaleMinFocused = false
@@ -344,6 +348,37 @@ struct PersonWeightView: View {
         }
     }
 
+    private func calculateDynamicYScale() -> (min: Double, max: Double)? {
+        // 获取最新体重
+        guard let latestWeight = weights.last?.weight else {
+            // 如果没有数据，使用默认范围
+            return (50.0, 80.0)
+        }
+
+        // 计算基于最新体重的范围：最新体重 ± 2.5kg
+        let computedMin = latestWeight - 2.5
+        let computedMax = latestWeight + 2.5
+
+        // 确保在有效范围内 (50-80kg)
+        let clampedMin = Swift.max(50.0, computedMin)
+        let clampedMax = Swift.min(80.0, computedMax)
+
+        return (clampedMin, clampedMax)
+    }
+
+    private func initializeYScale() {
+        // 只在第一次初始化时设置
+        guard !hasInitializedYScale else { return }
+
+        if let (min, max) = calculateDynamicYScale() {
+            yScaleMin = min
+            yScaleMax = max
+            yScaleMinText = String(format: "%.1f", min)
+            yScaleMaxText = String(format: "%.1f", max)
+        }
+        hasInitializedYScale = true
+    }
+
     private func applyYScaleRange() {
         guard let minVal = Double(yScaleMinText),
               let maxVal = Double(yScaleMaxText) else {
@@ -374,10 +409,13 @@ struct PersonWeightView: View {
     }
 
     private func resetZoom() {
-        yScaleMin = 50.0
-        yScaleMax = 80.0
-        yScaleMinText = "50.0"
-        yScaleMaxText = "80.0"
+        // 重置到基于最新体重的动态范围
+        if let (min, max) = calculateDynamicYScale() {
+            yScaleMin = min
+            yScaleMax = max
+            yScaleMinText = String(format: "%.1f", min)
+            yScaleMaxText = String(format: "%.1f", max)
+        }
     }
 
     // MARK: - Notifications

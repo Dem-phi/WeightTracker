@@ -341,6 +341,68 @@
 **优化时间**: 2026-02-28
 **状态**: 已完成
 
+### 2026-02-28 - 纵坐标范围动态初始化优化
+
+**问题描述**:
+用户希望每次打开程序时，图表的纵坐标范围不是固定的50-80kg，而是基于最新体重动态计算。具体需求为：纵坐标范围是最新体重±2.5kg，并且需要确保范围在50-80kg有效范围内。Zack Chen和Aria Luo各自有独立的纵坐标范围。
+
+**需求分析**:
+1. 打开程序时，根据最新体重计算纵坐标范围（最新体重±2.5kg）
+2. 确保计算出的范围在50-80kg有效范围内（超过则截断）
+3. Zack Chen和Aria Luo各自有独立的纵坐标范围，互不影响
+4. 用户仍可以通过手动输入或"重置"按钮调整纵坐标范围
+5. 如果没有数据，则使用默认范围50-80kg
+
+**解决方案**:
+1. 添加 `hasInitializedYScale` 状态变量，追踪是否已完成初始化
+2. 添加 `calculateDynamicYScale()` 函数，根据最新体重计算动态纵坐标范围
+   - 如果没有数据，返回默认范围(50.0, 80.0)
+   - 计算范围：最新体重±2.5kg
+   - 使用 `max(50.0, min)` 和 `min(80.0, max)` 确保在有效范围内
+3. 添加 `initializeYScale()` 函数，在视图首次出现时初始化纵坐标范围
+   - 使用 `hasInitializedYScale` 标志确保只初始化一次
+   - 计算动态范围并更新 yScaleMin、yScaleMax 及对应的文本
+4. 修改 `resetZoom()` 函数，重置到基于最新体重的动态范围，而不是固定的50-80kg
+5. 在 `.onAppear` 中调用 `initializeYScale()` 进行初始化
+
+**修改文件**:
+- `/Users/demphi/Projects/ZackApp/WeightTracker/WeightTracker/WeightTracker/ContentView.swift`
+  - 第 44-48 行：添加 `hasInitializedYScale` 状态变量
+  - 第 82-84 行：在 `.onAppear` 中添加 `initializeYScale()` 调用
+  - 第 335-358 行：添加 `calculateDynamicYScale()` 和 `initializeYScale()` 函数
+  - 第 376-384 行：修改 `resetZoom()` 函数，使用动态范围
+
+**示例效果**:
+- Zack Chen最新体重76kg → 纵坐标范围73.5-78.5kg
+- Aria Luo最新体重52kg → 纵坐标范围50-54.5kg（最小值被截断为50）
+- 无数据时 → 纵坐标范围50-80kg
+
+**用户体验改进**:
+- 打开程序后直接看到最新体重附近的详细变化
+- 不同用户各自独立的纵坐标范围，更直观
+- 重置按钮现在重置到合理的动态范围，而非固定范围
+
+**优化时间**: 2026-02-28
+**状态**: 已完成
+
+## 已修复的问题 ✅
+
+### 14. 纵坐标动态范围变量名冲突问题
+
+**问题描述**: `ContentView.swift:363:26 Cannot call value of non-function type 'Double'`
+**错误原因**: 在 `calculateDynamicYScale()` 函数中，定义了局部变量 `min` 和 `max`，这遮蔽了 Swift 标准库的全局函数 `max(_:_:)` 和 `min(_:_:)`，导致在后续代码中无法调用这些函数。
+
+**解决方案**:
+1. 将局部变量名从 `min` 和 `max` 改为 `computedMin` 和 `computedMax`
+2. 使用 `Swift.max()` 和 `Swift.min()` 显式调用标准库函数，避免潜在的命名冲突
+
+**相关文件**:
+- `/Users/demphi/Projects/ZackApp/WeightTracker/WeightTracker/WeightTracker/ContentView.swift`
+  - 第 359-364 行：修改变量名，使用显式命名空间调用函数
+
+**修复时间**: 2026-02-28
+**状态**: 已修复
+
 ### 2026-02-26 - 添加应用图标
 
 **优化内容**:
