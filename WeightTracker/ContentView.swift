@@ -36,6 +36,10 @@ struct PersonWeightView: View {
             return []
         }
     }
+    
+    private var historyWeights: [Weight] {
+        weights.sorted { $0.date > $1.date }
+    }
 
     @State private var selectedDate: Date = Date()
     @State private var weightText: String = ""
@@ -46,6 +50,7 @@ struct PersonWeightView: View {
     @State private var yScaleMinText: String = "50.0"
     @State private var yScaleMaxText: String = "80.0"
     @State private var hasInitializedYScale: Bool = false
+    @State private var selectedChartPoint: (date: Date, weight: Double)?
 
     private let notif = NotificationManager()
 
@@ -125,6 +130,22 @@ struct PersonWeightView: View {
                             PointMark(x: .value("日期", w.date), y: .value("体重", w.weight))
                                 .foregroundStyle(person.color)
                         }
+                        
+                        if let selected = selectedChartPoint {
+                            PointMark(
+                                x: .value("选中日期", selected.date),
+                                y: .value("选中体重", selected.weight)
+                            )
+                            .symbolSize(140)
+                            .foregroundStyle(.orange)
+                            .annotation(position: .top) {
+                                Text(String(format: "%.2f kg", selected.weight))
+                                    .font(.caption2.bold())
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
                     }
                     .chartYScale(domain: yScaleMin...yScaleMax)
                     .chartXAxis {
@@ -139,6 +160,35 @@ struct PersonWeightView: View {
                             AxisGridLine()
                             AxisTick()
                             AxisValueLabel()
+                        }
+                    }
+                    .chartOverlay { proxy in
+                        GeometryReader { geometry in
+                            Rectangle()
+                                .fill(Color.clear)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onEnded { value in
+                                            guard let plotFrame = proxy.plotFrame else { return }
+                                            let plotRect = geometry[plotFrame]
+                                            let point = CGPoint(
+                                                x: value.location.x - plotRect.origin.x,
+                                                y: value.location.y - plotRect.origin.y
+                                            )
+                                            
+                                            if point.x < 0 || point.y < 0 || point.x > plotRect.width || point.y > plotRect.height {
+                                                selectedChartPoint = nil
+                                                return
+                                            }
+                                            
+                                            if let nearest = nearestWeight(near: point, proxy: proxy) {
+                                                selectedChartPoint = (nearest.date, nearest.weight)
+                                            } else {
+                                                selectedChartPoint = nil
+                                            }
+                                        }
+                                )
                         }
                     }
                     .frame(height: 240)
@@ -240,7 +290,7 @@ struct PersonWeightView: View {
     private var listArea: some View {
         GroupBox(label: Label("历史记录", systemImage: "list.bullet")) {
             List {
-                ForEach(weights) { w in
+                ForEach(historyWeights) { w in
                     HStack {
                         Text(w.date, style: .date)
                         Spacer()
@@ -293,8 +343,30 @@ struct PersonWeightView: View {
     }
 
     private func delete(offsets: IndexSet) {
-        offsets.map { weights[$0] }.forEach(viewContext.delete)
+        offsets.map { historyWeights[$0] }.forEach(viewContext.delete)
         do { try viewContext.save() } catch { print(error) }
+    }
+    
+    private func nearestWeight(near location: CGPoint, proxy: ChartProxy) -> Weight? {
+        let maxDistance: CGFloat = 24
+        var selected: (weight: Weight, distance: CGFloat)?
+        
+        for item in weights {
+            guard let point = proxy.position(for: (item.date, item.weight)) else { continue }
+            let distance = hypot(point.x - location.x, point.y - location.y)
+            
+            if distance <= maxDistance {
+                if let current = selected {
+                    if distance < current.distance {
+                        selected = (item, distance)
+                    }
+                } else {
+                    selected = (item, distance)
+                }
+            }
+        }
+        
+        return selected?.weight
     }
 
     // MARK: - Statistics
@@ -444,4 +516,3 @@ struct ContentView_Previews: PreviewProvider {
         ContentView()
     }
 }
-
